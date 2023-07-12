@@ -1,16 +1,16 @@
 import discord
 from discord import app_commands
+import requests
 from dotenv import load_dotenv
 load_dotenv()
-import openai
 import os
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 DEEPL_API_KEY = os.getenv("DEEPL_API_KEY")
-OWNER_ID = os.getenv("OWNER_ID")
-MY_SERVER_ID = os.getenv("MY_SERVER_ID")
+OWNER_ID = int(os.getenv("OWNER_ID"))
+MY_SERVER_ID = int(os.getenv("MY_SERVER_ID"))
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+import openai
 openai.api_key = os.environ[OPENAI_API_KEY]
-import requests
 
 
 intents = discord.Intents.all()
