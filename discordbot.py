@@ -9,9 +9,6 @@ DEEPL_API_KEY = os.getenv("DEEPL_API_KEY")
 OWNER_ID = int(os.getenv("OWNER_ID"))
 MY_SERVER_ID = int(os.getenv("MY_SERVER_ID"))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-import openai
-openai.api_key = os.environ[OPENAI_API_KEY]
-
 
 intents = discord.Intents.all()
 client = discord.Client(intents=intents)
@@ -25,31 +22,27 @@ async def on_ready():
     
 ###############################################################
 # ChatGPT関連
-from langchainbot import chatgptorg
+from gpt import gpt_one_response as one_res
+from gpt import gpt_with_langchain as gptchain
 
 # インスタンス生成
-cgo = chatgptorg(OPENAI_API_KEY)
+lc = gptchain(OPENAI_API_KEY)
 
 # GPT-4コマンド(API解放待ち)
 @tree.command(name="gpt", description="GPT-4で文章を生成します")
 async def gpt(interaction: discord.Interaction, text: str):
-  # await interaction.response.defer()
-  # response = openai.ChatCompletion.create(
-  #     model = "gpt-4",
-  #     messages=[
-  #         {"role": "system", "content": "あなたは優秀なアシスタントです．"},
-  #         {"role": "user", "content": text},
-  #     ]
-  # )
-  # await interaction.followup.send(response["choices"][0]["message"]["content"])
+  await interaction.response.defer()
+  one_r = one_res(OPENAI_API_KEY, model_name="gpt-4")
+  response = one_r.calling(text)
+  await interaction.followup.send(response["choices"][0]["message"]["content"])
   await interaction.response.send_message('api待ちです，ごめんね！')
 
-# メンション呼び出し・メモリ付き
+# メンション呼び出し(langchain)
 @client.event
 async def on_message(message):
     if client.user in message.mentions:
         server = message.guild.id
-        response = cgo.output(server, message.content)
+        response = lc.output(server, message.content)
         print(response)
         await message.channel.send(response)
 
@@ -57,7 +50,7 @@ async def on_message(message):
 @tree.command(name="talkreset", description="会話履歴を削除")
 async def langchainstop_command(interaction: discord.Interaction):
   await interaction.response.defer()
-  cgo.reset_history(interaction.guild.id)
+  lc.reset_history(interaction.guild.id)
   await interaction.followup.send("リセットしました。")
 
 ###############################################################
@@ -110,46 +103,6 @@ async def translate_command(interaction: discord.Interaction, lang:app_commands.
   )
   translated = responce.json()["translations"][0]["text"]
   await interaction.followup.send(str(translated))
-
-# 翻訳コマンドのヘルプ(使わない？)
-@tree.command(name="trans_help", description="言語指定コードを表示します")
-async def transhelp_command(interaction: discord.Interaction):
-  await interaction.response.send_message(
-    """
-```
-BG - Bulgarian
-CS - Czech
-DA - Danish
-DE - German
-EL - Greek
-EN-GB - English (British)
-EN-US - English (American)
-ES - Spanish
-ET - Estonian
-FI - Finnish
-FR - French
-HU - Hungarian
-ID - Indonesian
-IT - Italian
-JA - Japanese
-KO - Korean
-LT - Lithuanian
-LV - Latvian
-NB - Norwegian (Bokmål)
-NL - Dutch
-PL - Polish
-PT-BR - Portuguese (Brazilian)
-PT-PT - Portuguese (all Portuguese varieties excluding Brazilian Portuguese)
-RO - Romanian
-RU - Russian
-SK - Slovak
-SL - Slovenian
-SV - Swedish
-TR - Turkish
-UK - Ukrainian
-ZH - Chinese (simplified)
-```
-    """)
 
 ###############################################################
 # デバッグ用コマンド
