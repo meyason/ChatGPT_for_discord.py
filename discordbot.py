@@ -21,7 +21,7 @@ async def on_ready():
     
 ###############################################################
 # ChatGPT関連
-from langchainbot import chatgptorg
+from gpt import chatgptorg
 import openai
 from openai import OpenAI
 from PIL import Image
