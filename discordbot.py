@@ -1,14 +1,13 @@
 import discord
 from discord import app_commands
-import requests
 from dotenv import load_dotenv
 load_dotenv()
 import os
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-DEEPL_API_KEY = os.getenv("DEEPL_API_KEY")
 OWNER_ID = int(os.getenv("OWNER_ID"))
 MY_SERVER_ID = int(os.getenv("MY_SERVER_ID"))
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+import requests
+
 
 intents = discord.Intents.all()
 client = discord.Client(intents=intents)
@@ -22,38 +21,85 @@ async def on_ready():
     
 ###############################################################
 # ChatGPT関連
-from gpt import gpt_one_response as one_res
-from gpt import gpt_with_langchain as gptchain
+from langchainbot import chatgptorg
+import openai
+from openai import OpenAI
+from PIL import Image
+from io import BytesIO
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
 # インスタンス生成
-lc = gptchain(OPENAI_API_KEY)
+cgo = chatgptorg(OPENAI_API_KEY)
 
-# GPT-4コマンド(API解放待ち)
+# GPT-4
 @tree.command(name="gpt", description="GPT-4で文章を生成します")
 async def gpt(interaction: discord.Interaction, text: str):
   await interaction.response.defer()
-  one_r = one_res(OPENAI_API_KEY, model_name="gpt-4")
-  response = one_r.calling(text)
-  await interaction.followup.send(response["choices"][0]["message"]["content"])
-  await interaction.response.send_message('api待ちです，ごめんね！')
+  client = OpenAI()
+  response = client.chat.completions.create(
+      model = "gpt-4-1106-preview",
+      messages=[
+          {"role": "system", "content": "あなたはDiscordのbotで，饒舌に話します．"},
+          {"role": "user", "content": text},
+      ]
+  )
+  # discordの文字数上限2000字に引っかかったら分割して送信
+  message = response.choices[0].message.content
+  if len(message) > 2000:
+    for i in range(0, len(message), 2000):
+      await interaction.followup.send(message[i:i+2000])
+  else:
+    await interaction.followup.send(message)
+    return
 
-# メンション呼び出し(langchain)
+# メンション呼び出し・メモリ付き
 @client.event
 async def on_message(message):
     if client.user in message.mentions:
         server = message.guild.id
-        response = lc.output(server, message.content)
-        print(response)
-        await message.channel.send(response)
+        message.content = message.content.replace("<@1074516884399063051>", "")
+        response = cgo.output(server, message.content)
+        # discordの文字数上限2000字に引っかかったら分割して送信
+        if len(response) > 2000:
+            for i in range(0, len(response), 2000):
+                await message.channel.send(response[i:i+2000])
+        else:
+          await message.channel.send(response)
+        return
 
 # メモリ削除
 @tree.command(name="talkreset", description="会話履歴を削除")
 async def langchainstop_command(interaction: discord.Interaction):
   await interaction.response.defer()
-  lc.reset_history(interaction.guild.id)
+  cgo.reset_history(interaction.guild.id)
   await interaction.followup.send("リセットしました。")
 
+# DALL-E
+@tree.command(name="img_gen", description="DALL-Eで画像を生成します")
+async def dall_e_command(interaction: discord.Interaction, text: str):
+  await interaction.response.defer()
+  try:
+    client = OpenAI()
+    response = client.images.generate(
+      model="dall-e-2",
+      prompt=text,
+      size="1024x1024",
+      quality="standard",
+      n=1,
+    )
+  except:
+     await interaction.followup.send("画像生成に失敗しました。")
+     return
+  # 受け取った画像をdiscordに送信
+  image_url = response.data[0].url
+  image = Image.open(BytesIO(requests.get(image_url).content))
+  image.save("image.png")
+  await interaction.followup.send(file=discord.File("image.png"))
+
 ###############################################################
+
+DEEPL_API_KEY = os.getenv("DEEPL_API_KEY")
 
 # DeepL翻訳コマンド
 @tree.command(name="translate", description="翻訳先の言語コードを指定すれば、翻訳できます")
@@ -103,6 +149,46 @@ async def translate_command(interaction: discord.Interaction, lang:app_commands.
   )
   translated = responce.json()["translations"][0]["text"]
   await interaction.followup.send(str(translated))
+
+# 翻訳コマンドのヘルプ(使わない？)
+@tree.command(name="trans_help", description="言語指定コードを表示します")
+async def transhelp_command(interaction: discord.Interaction):
+  await interaction.response.send_message(
+    """
+```
+BG - Bulgarian
+CS - Czech
+DA - Danish
+DE - German
+EL - Greek
+EN-GB - English (British)
+EN-US - English (American)
+ES - Spanish
+ET - Estonian
+FI - Finnish
+FR - French
+HU - Hungarian
+ID - Indonesian
+IT - Italian
+JA - Japanese
+KO - Korean
+LT - Lithuanian
+LV - Latvian
+NB - Norwegian (Bokmål)
+NL - Dutch
+PL - Polish
+PT-BR - Portuguese (Brazilian)
+PT-PT - Portuguese (all Portuguese varieties excluding Brazilian Portuguese)
+RO - Romanian
+RU - Russian
+SK - Slovak
+SL - Slovenian
+SV - Swedish
+TR - Turkish
+UK - Ukrainian
+ZH - Chinese (simplified)
+```
+    """)
 
 ###############################################################
 # デバッグ用コマンド
